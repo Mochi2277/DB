@@ -1,0 +1,18 @@
+name = "db-practice-api"
+main = "worker.mjs"
+compatibility_date = "2026-09-28"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Set the exact origin of your GitHub Pages site, without a repository path.
+ALLOWED_ORIGINS = "https://mochi2277.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "db-practice"
+database_id = "ace666a5-b7a6-44b9-b0ec-948fe00fea4d"
+migrations_dir = "migrations"
+
+[triggers]
+crons = ["17 * * * *"]
+
