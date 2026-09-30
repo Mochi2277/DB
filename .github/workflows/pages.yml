@@ -22,6 +22,8 @@ jobs:
           python-version: '3.12'
       - run: pip install pypdfium2 Pillow
       - run: python scripts/build_assets.py
+      - run: python scripts/fetch_pdfjs.py
+      - run: node tests/archive.cjs
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
