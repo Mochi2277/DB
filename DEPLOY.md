@@ -27,7 +27,7 @@ ALLOWED_ORIGINS は `https://mochi2277.github.io` です。リポジトリ名の
 
 Mochi2277/DB の Settings → Pages → Build and deployment → Source を GitHub Actions に設定します。
 main への更新でテスト、公式PDFのハッシュ確認・画像生成、dist の公開を実行します。
-予定URLは https://mochi2277.github.io/DB/ です。
+公開URLは https://mochi2277.github.io/DB/ です。
 PDF・画像は容量削減のためGitに含めず、公式URLとハッシュから再構築します。
 
 ## 検証
@@ -50,3 +50,13 @@ APIテストはメモリ内SQLiteを使い、登録、ログイン、ユーザ�
 - 公開後はCloudflareの使用量を確認してください。有料プランへの変更は自動で行いません。
 
 APIトークン、パスワード、.dev.vars、.env はGitHubへ登録しないでください。
+
+## 公開確認（2026-09-30）
+
+- GitHub PagesとCloudflare APIを公開済み。API URL: https://db-practice-api.fullcounthappeace.workers.dev
+- D1はdb-practice。初回スキーマは管理画面で適用済みです。初回migrationはIF NOT EXISTSを使い、後からWranglerの履歴に登録しても既存テーブルを壊しません。
+- 毎時17分に期限切れセッション・試行回数カウンターを整理します。
+- 実環境の登録、ログイン、保存、競合拒否、ログアウト、再ログイン・復元を確認しました。
+- 公開画面で午後の空欄入力・照合結果・35点の自己採点が再読み込み後も戻ることを確認しました。
+- テスト用ID qa_66ee2837d6 が1件あります。実利用者のIDではありません。
+- フロントエンドはmainへの更新で自動公開されます。API更新は上記のWrangler手順で別途デプロイします。
