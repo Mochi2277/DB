@@ -10,17 +10,17 @@ const fail=(status,message)=>{throw new ApiError(status,message);};
 async function body(request){if(!(request.headers.get('content-type')||'').startsWith('application/json'))fail(415,'JSON形式が必要です。');const reader=request.body?.getReader();if(!reader)fail(400,'入力がありません。');let chunks=[],size=0;while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>150000){await reader.cancel();fail(413,'解答が長すぎます。');}chunks.push(value);}try{const b=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!b||typeof b!=='object'||Array.isArray(b))fail(400,'入力形式が不正です。');return b;}catch(e){if(e instanceof ApiError)throw e;fail(400,'入力形式が不正です。');}}
 function credentials(b){const username=typeof b.username==='string'?b.username.trim().toLowerCase():'';if(!/^[a-z0-9_]{3,32}$/.test(username))fail(400,'IDは半角英数字と_で3〜32文字です。');if(typeof b.password!=='string'||b.password.length<12||b.password.length>128)fail(400,'パスワードは12〜128文字です。');return {username,password:b.password};}
 export function validateProgress(p){
- if(!p||p.version!==1||p.exam!=='2025-db'||!p.am||!p.pm)fail(400,'保存データの形式が不正です。');
+ if(!p||p.version!==1||!/^20(?:09|1[0-9]|2[0-5])-db$/.test(p.exam)||!p.am||!p.pm)fail(400,'保存データの形式が不正です。');
  const am=p.am;if(!Array.isArray(am.answers)||am.answers.length!==25||am.answers.some(x=>x!==null&&!['ア','イ','ウ','エ'].includes(x)))fail(400,'午前の解答が不正です。');
  if(!Array.isArray(am.checked)||am.checked.length!==25||am.checked.some(x=>typeof x!=='boolean'))fail(400,'採点データが不正です。');
- const out={version:1,exam:'2025-db',am:{answers:am.answers,checked:am.checked,summary:!!am.summary},pm:{}};
+ const out={version:1,exam:p.exam,am:{answers:am.answers,checked:am.checked,summary:!!am.summary},pm:{}};
  for(const mode of ['pm1','pm2']){
   const src=p.pm[mode];if(!src||typeof src!=='object')fail(400,'午後の解答が不正です。');const dst={answers:{},checked:{},manual:{},scores:{}};
   for(const kind of ['answers','checked','manual','scores']){
-   const map=src[kind]||{};if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>150)fail(400,'解答項目が不正です。');
+   const map=src[kind]||{};if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>300)fail(400,'解答項目が不正です。');
    for(const [k,v] of Object.entries(map)){
     if(kind==='scores'){if(!/^[1-3]$/.test(k)||!Number.isInteger(v)||v<0||v>(mode==='pm1'?50:100))fail(400,'自己採点が不正です。');}
-    else {if(!/^[1-3]:[1-3]-\d{1,3}$/.test(k))fail(400,'解答番号が不正です。');if(kind==='answers'&&(typeof v!=='string'||v.length>8000))fail(400,'解答は1項目8000文字以内です。');if(kind==='checked'&&typeof v!=='boolean')fail(400,'採点データが不正です。');if(kind==='manual'&&!['','correct','incorrect'].includes(v))fail(400,'自己評価が不正です。');}
+    else {if(!/^[1-3]:[1-9]-\d{1,3}$/.test(k))fail(400,'解答番号が不正です。');if(kind==='answers'&&(typeof v!=='string'||v.length>8000))fail(400,'解答は1項目8000文字以内です。');if(kind==='checked'&&typeof v!=='boolean')fail(400,'採点データが不正です。');if(kind==='manual'&&!['','correct','incorrect'].includes(v))fail(400,'自己評価が不正です。');}
     dst[kind][k]=v;
    }
   }out.pm[mode]=dst;
@@ -30,7 +30,8 @@ async function limit(db,key,max,now){const window=900,expiry=(Math.floor(now/win
 async function identity(request,db,now){const raw=request.headers.get('authorization')||'';if(!/^Bearer [a-f0-9]{64}$/.test(raw))fail(401,'ログインしてください。');const hash=digest(raw.slice(7));const user=await db.prepare('SELECT users.id,users.username FROM sessions JOIN users ON users.id=sessions.user_id WHERE token_hash=? AND expires_at>?').bind(hash,now).first();if(!user)fail(401,'ログインの有効期限が切れました。');return {...user,tokenHash:hash};}
 async function session(db,user,now){const token=randomBytes(32).toString('hex');await db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES (?,?,?)').bind(digest(token),user.id,now+SESSION_SECONDS).run();return {token,user:{username:user.username},expiresAt:now+SESSION_SECONDS};}
 async function route(request,env,now){
- const db=env.DB,path=new URL(request.url).pathname,method=request.method;
+ const db=env.DB,url=new URL(request.url),path=url.pathname,method=request.method;
+ const examId=url.searchParams.get('exam')||'2025-db';if(path==='/api/progress'&&!/^20(?:09|1[0-9]|2[0-5])-db$/.test(examId))fail(400,'年度が不正です。');
  if(path==='/api/health'&&method==='GET')return {ok:true};
  if(['/api/register','/api/login'].includes(path)&&method==='POST'){
   const ip=request.headers.get('CF-Connecting-IP')||'local';await limit(db,'ip:'+path+':'+ip,path.endsWith('register')?5:30,now);
@@ -49,9 +50,15 @@ async function route(request,env,now){
  await limit(db,'api:'+user.id,500,now);
  if(path==='/api/me'&&method==='GET')return {user:{username:user.username}};
  if(path==='/api/logout'&&method==='POST'){await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(user.tokenHash).run();return {ok:true};}
+ if(path==='/api/progress'&&examId!=='2025-db'){
+  if(method==='GET'){const row=await db.prepare('SELECT payload,revision,updated_at FROM progress_archive WHERE user_id=? AND exam=?').bind(user.id,examId).first();return {progress:row?.payload?JSON.parse(row.payload):null,revision:row?.revision||0,updatedAt:row?.updated_at||0};}
+  if(method==='PUT'){const b=await body(request);if(!Number.isSafeInteger(b.revision)||b.revision<0)fail(400,'保存番号が不正です。');const progress=validateProgress(b.progress);if(progress.exam!==examId)fail(400,'年度が一致しません。');const payload=JSON.stringify(progress);
+   const row=b.revision===0?await db.prepare('INSERT INTO progress_archive(user_id,exam,payload,revision,updated_at) VALUES (?,?,?,1,?) ON CONFLICT(user_id,exam) DO NOTHING RETURNING revision').bind(user.id,examId,payload,now).first():await db.prepare('UPDATE progress_archive SET payload=?,revision=revision+1,updated_at=? WHERE user_id=? AND exam=? AND revision=? RETURNING revision').bind(payload,now,user.id,examId,b.revision).first();
+   if(!row)fail(409,'別の画面で更新されています。保存済みデータを読み直してください。');return {revision:row.revision,updatedAt:now};}
+ }
  if(path==='/api/progress'&&method==='GET'){const row=await db.prepare('SELECT payload,revision,updated_at FROM progress WHERE user_id=?').bind(user.id).first();return {progress:row.payload?JSON.parse(row.payload):null,revision:row.revision,updatedAt:row.updated_at};}
  if(path==='/api/progress'&&method==='PUT'){
-  const b=await body(request);if(!Number.isSafeInteger(b.revision)||b.revision<0)fail(400,'保存番号が不正です。');const payload=JSON.stringify(validateProgress(b.progress));
+  const b=await body(request);if(!Number.isSafeInteger(b.revision)||b.revision<0)fail(400,'保存番号が不正です。');const progress=validateProgress(b.progress);if(progress.exam!==examId)fail(400,'年度が一致しません。');const payload=JSON.stringify(progress);
   const row=await db.prepare('UPDATE progress SET payload=?,revision=revision+1,updated_at=? WHERE user_id=? AND revision=? RETURNING revision').bind(payload,now,user.id,b.revision).first();
   if(!row)fail(409,'別の画面で更新されています。保存済みデータを読み直してください。');return {revision:row.revision,updatedAt:now};
  }
