@@ -41,6 +41,7 @@
  byId('use-saved').onclick=useRemote;
  byId('use-current').onclick=()=>{revision=remote.revision;lastSaved='';lastObserved=snapshot();ready=true;conflict=false;byId('choose-progress').hidden=true;render();save().catch(()=>{});};
  byId('save-now').onclick=()=>save().catch(()=>{});
+ byId('account-history').onclick=async event=>{event.preventDefault();if(conflict||!ready||!byId('choose-progress').hidden){status('先に保存データの確認を完了してください。');return;}clearTimeout(timer);try{await save();location.assign('history.html');}catch(e){status(e.message+' 成績ページへの移動は中止しました。');}};
  byId('reload-saved').onclick=()=>{ready=false;loadProgress().catch(e=>status(e.message));};
  byId('account-logout').onclick=async()=>{
   if(conflict||!byId('choose-progress').hidden){status('先に保存済みの解答と現在の解答のどちらを使うか選んでください。');return;}clearTimeout(timer);try{if(ready&&!conflict)await save();await api('logout','POST');remember('');user=null;ready=false;conflict=false;lastSaved='';globalThis.StudyState.reset();lastObserved=snapshot();byId('choose-progress').hidden=true;byId('reload-saved').hidden=true;byId('reauth').hidden=true;render();status('ログアウトしました。この画面の解答は消去しました。');}catch(e){status(e.message+' ログアウトは完了していません。');}
