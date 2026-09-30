@@ -36,3 +36,5 @@ for(const [q,items] of Object.entries(globalThis.PM_FIELDS)){
 }
 console.log(`PASS: 20 edge cases; ${auto} automatic fields and ${manual} self-review fields across 5 questions.`);
 
+
+require('./history.cjs');
