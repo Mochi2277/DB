@@ -7,6 +7,7 @@
  const snapshot=()=>JSON.stringify(globalThis.StudyState.snapshot());
  function remember(value){token=value;try{if(value)sessionStorage.setItem(tokenKey,value);else sessionStorage.removeItem(tokenKey);}catch{}}
  async function api(path,method='GET',data){
+  if(path==='progress')path+='?exam='+encodeURIComponent(globalThis.ACTIVE_EXAM.id);
   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
   try{const response=await fetch(base+'/api/'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(data?{body:JSON.stringify(data)}:{}),signal:controller.signal,cache:'no-store'});const result=await response.json();if(!response.ok){const error=new Error(result.error||'通信に失敗しました。');error.status=response.status;throw error;}return result;}
   catch(e){if(e.name==='AbortError')throw new Error('通信がタイムアウトしました。解答はこの画面に残っています。');throw e;}finally{clearTimeout(timeout);}
@@ -46,6 +47,7 @@
  };
  document.addEventListener('input',()=>queueMicrotask(observe));document.addEventListener('change',()=>queueMicrotask(observe));document.addEventListener('click',()=>queueMicrotask(observe));
  window.addEventListener('beforeunload',event=>{if(user&&snapshot()!==lastSaved){event.preventDefault();event.returnValue='';}});
+ globalThis.StudyAccount={async changeYear(year){if(conflict||!byId('choose-progress').hidden){status('先に保存データを選んでください。');return false;}try{if(user){if(!ready){status('ログインと保存の準備が終わってから年度を切り替えてください。');return false;}await save();}location.assign('?year='+encodeURIComponent(year));return true;}catch(e){status(e.message+' 年度の切り替えは中止しました。');return false;}}};
  lastObserved=snapshot();render();status(base?'ゲストの解答は保存されません。ログインすると自動保存されます。':'ゲストで利用中（回答保存サービスは公開設定中）');
  if(base&&token)api('me').then(r=>{user=r.user;render();return loadProgress();}).catch(e=>{if(e.status===401)remember('');status(e.message);});
 })();

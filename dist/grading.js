@@ -22,7 +22,7 @@
   }
   const compare=field.kind==='columns'?equalList:field.kind==='sql'?(a,b)=>sql(a)===sql(b):field.kind==='prose'?(a,b)=>prose(a)===prose(b):(a,b)=>name(a)===name(b);
   if(answers.some(a=>compare(value,a)))return 'correct';
-  return ['sql','prose'].includes(field.kind)?'review':'incorrect';
+  return field.reviewMismatch||['sql','prose'].includes(field.kind)?'review':'incorrect';
  }
  root.PMGrader={grade,columns,sql};
  if(typeof module!=='undefined'&&module.exports)module.exports=root.PMGrader;
