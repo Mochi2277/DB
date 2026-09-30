@@ -12,6 +12,7 @@ for item in json.loads((base/'sources.json').read_text(encoding='utf-8')):
     if hashlib.sha256(data).hexdigest()!=item['sha256']:
         raise ValueError('Official source changed; review before publishing: '+item['file'])
     path.write_bytes(data)
+    if not path.name.startswith('2025r07a_db_'):continue
     name=path.stem.removeprefix('2025r07a_db_')
     dest=base/'pages'/name;dest.mkdir(parents=True,exist_ok=True)
     with pdfium.PdfDocument(path) as doc:
