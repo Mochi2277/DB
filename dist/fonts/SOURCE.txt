@@ -1,0 +1,4 @@
+BIZ UDPGothic 1.051
+https://raw.githubusercontent.com/googlefonts/morisawa-biz-ud-gothic/18934af56b9c003ca58c54bffbf226848cb11032/
+Copyright 2022 The BIZ UDGothic Project Authors
+SIL Open Font License 1.1: see OFL.txt
