@@ -1,62 +1,53 @@
-# 公開手順
+# 公開・更新手順
 
-フロントエンドは GitHub Pages、ID・パスワード認証と解答保存は Cloudflare Workers + D1 を使用します。メールアドレスは収集しません。
+本番URLは https://db-enshushitsu.pages.dev/ です。Cloudflare PagesのDirect Uploadで配信しています。GitHubへのpushだけではCloudflare Pagesは更新されません。
 
-## Cloudflare
+## ローカル構築
 
-Node.js 24 と Wrangler を使える環境で以下を実行します。
-
-```sh
-cd api
-npx wrangler login
-npx wrangler d1 create db-practice
-```
-
-作成された database_id を wrangler.toml に設定します。
+Node.js 24、Python 3.12以降を使用します。
 
 ```sh
-npx wrangler d1 migrations apply db-practice --remote
-npx wrangler deploy
+pip install pypdfium2 Pillow
+python scripts/build_assets.py
+python scripts/fetch_pdfjs.py
+node tests/grading.cjs
+node tests/api.mjs
+node tests/archive.cjs
+python scripts/build_pages.py
 ```
 
-ALLOWED_ORIGINS は `https://mochi2277.github.io` です。リポジトリ名のパスは含めません。
-デプロイ後の HTTPS URL を dist/config.js の apiBase に設定します。これは公開URLであり、秘密鍵は含みません。
-定期処理で期限切れセッションと試行回数カウンターを削除します。
+公式PDF136点は sources.json のURLから取得しSHA-256を検証します。PDF.js 6.3.289は公式npm配布物のSHA-512を検証します。2025年度の表示画像を生成し、過去年度はブラウザー内のPDF.jsで描画します。
+
+## Cloudflare Pages
+
+Workers & Pages → db-enshushitsu → Create deployment → Production で構築済み dist フォルダーをアップロードします。全ファイルのアップロード成功後に Deploy site を押します。大きなZIPではなくフォルダーを選びます。
+
+本番設定:
+- compatibility date: 2026-09-30
+- compatibility flag: nodejs_compat
+- D1 binding: DB → db-practice
+- ALLOWED_ORIGINS: https://db-enshushitsu.pages.dev,https://mochi2277.github.io
+
+_worker.js が /api/* を処理し、静的資料はPagesから配信されます。D1スキーマは api/migrations のSQLを順に適用します。0001と0002は既存環境に適用済みです。CREATE TABLE IF NOT EXISTSなので既存テーブルを壊しません。
+
+2025年度は従来のprogress表を継続利用し、2009〜2024年度はprogress_archive表でユーザー・年度別に保存します。既存アカウントをそのまま利用できます。旧Workerの毎時17分の期限切れセッション整理は継続しています。
 
 ## GitHub Pages
 
-Mochi2277/DB の Settings → Pages → Build and deployment → Source を GitHub Actions に設定します。
-main への更新でテスト、公式PDFのハッシュ確認・画像生成、dist の公開を実行します。
-公開URLは https://mochi2277.github.io/DB/ です。
-PDF・画像は容量削減のためGitに含めず、公式URLとハッシュから再構築します。
+GitHubのmain更新でテスト・資料再構築・GitHub Pages公開を行います。旧URLは https://mochi2277.github.io/DB/ です。フロントエンドは新しいPages APIへ接続します。Cloudflare Pages本番は上記の別途アップロードが必要です。
 
-## 検証
+## 認証・採点
 
-```sh
-node tests/grading.cjs
-node tests/api.mjs
-```
+パスワードはランダムソルト付きscrypt（N=32768,r=8,p=3）で保存します。セッションは8時間、サーバーにはトークンのSHA-256だけを保存します。更新番号で別画面からの上書きを防ぎます。メール収集・パスワード復旧はありません。ゲストはメモリ内のみです。
 
-APIテストはメモリ内SQLiteを使い、登録、ログイン、ユーザー分離、保存復元、更新競合、入力検証、CORS、ハッシュ保存、ログアウト、セッション期限、削除処理、試行回数制限を確認します。Cloudflare実環境での動作確認は別途必要です。
+採点は学習用です。午後は公式解答例との比較であり、意味的に等価なSQL・文章を完全判定するものではありません。図表等は自己照合します。
 
-## 保存と認証
+## 2026-09-30 検証
 
-- パスワードはランダムソルト付き scrypt (N=32768, r=8, p=3) のみ保存します。
-- 8時間有効のセッションを使い、DBにはトークンのSHA-256だけを保存します。ブラウザーはセッションストレージに保存します。
-- 解答はアカウントごとに保存し、更新番号で別画面からの上書きを防ぎます。
-- ゲストの解答はメモリだけに保持します。ログアウト時は表示中の解答も消去します。
-- メール認証・パスワード復旧はありません。ID・パスワードを控えて利用します。
-- 採点は学習用のクライアント計算です。成績証明や不正防止には使えません。
-- 公開後はCloudflareの使用量を確認してください。有料プランへの変更は自動で行いません。
+17年度、午前425問、午後1668項目（自動比較1208、自己照合460）、PDF136点のハッシュ確認済み。認証、ユーザー・年度分離、更新競合のローカルテストに合格しました。Pages実環境でも既存アカウントのログイン、2025年度保存データ保持、2024年度保存・再ログイン復元、2009年度分離、ログアウトを確認しました。
 
-APIトークン、パスワード、.dev.vars、.env はGitHubへ登録しないでください。
+## 広告
 
-## 公開確認（2026-09-30）
+所有者提供の楽天アフィリエイトURL3件をそのまま掲載しています。広告表示とプライバシーページを設置しています。所有者は新URLを楽天側のサイト情報へ登録してください。
 
-- GitHub PagesとCloudflare APIを公開済み。API URL: https://db-practice-api.fullcounthappeace.workers.dev
-- D1はdb-practice。初回スキーマは管理画面で適用済みです。初回migrationはIF NOT EXISTSを使い、後からWranglerの履歴に登録しても既存テーブルを壊しません。
-- 毎時17分に期限切れセッション・試行回数カウンターを整理します。
-- 実環境の登録、ログイン、保存、競合拒否、ログアウト、再ログイン・復元を確認しました。
-- 公開画面で午後の空欄入力・照合結果・35点の自己採点が再読み込み後も戻ることを確認しました。
-- テスト用ID qa_66ee2837d6 が1件あります。実利用者のIDではありません。
-- フロントエンドはmainへの更新で自動公開されます。API更新は上記のWrangler手順で別途デプロイします。
+APIトークン、パスワード、.env、.dev.vars はGitHubへ登録しないでください。
