@@ -2,7 +2,8 @@
 const $=id=>document.getElementById(id);
 const active=globalThis.ACTIVE_EXAM;
 const exam=window.EXAM;
-const state={mode:'am2',q:0,answers:Array(25).fill(null),checked:Array(25).fill(false),summary:false,pm:{pm1:{q:1,doc:'qs',page:6,answers:{},scores:{}},pm2:{q:1,doc:'qs',page:7,answers:{},scores:{}}}};
+const requestedQuestion=Number(new URLSearchParams(location.search).get('question'));
+const state={mode:'am2',q:Number.isInteger(requestedQuestion)&&requestedQuestion>=1&&requestedQuestion<=25?requestedQuestion-1:0,answers:Array(25).fill(null),checked:Array(25).fill(false),summary:false,pm:{pm1:{q:1,doc:'qs',page:6,answers:{},scores:{}},pm2:{q:1,doc:'qs',page:7,answers:{},scores:{}}}};
 const modes={am2:'午前Ⅱ',pm1:'午後Ⅰ',pm2:'午後Ⅱ'};
 const pmMeta=active.pmMeta;
 for(const mode of ["pm1","pm2"])state.pm[mode].page=pmMeta[mode].questions[0].start;
