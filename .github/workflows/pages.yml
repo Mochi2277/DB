@@ -23,7 +23,9 @@ jobs:
       - run: pip install pypdfium2 Pillow
       - run: python scripts/build_assets.py
       - run: python scripts/fetch_pdfjs.py
+      - run: node scripts/build_seo.cjs
       - run: node tests/archive.cjs
+      - run: node tests/seo.cjs
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
