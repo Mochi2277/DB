@@ -1,0 +1,22 @@
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+module.exports=function({page,root,origin}){
+ const d=JSON.parse(fs.readFileSync(path.join(__dirname,'explanations-2025.json'),'utf8'));
+ const c={};c.window=c;vm.createContext(c);for(const file of ['data.js','pm-data.js','archive-data.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),c);
+ const {esc,paras,am,pm}=require('../dist/explanation-render.js'),official=c.PM_FIELDS[d.pm.key],files=c.EXAM_ARCHIVE[d.year].files;
+ assert.equal(d.am.length,25);assert.equal(new Set(d.am.map(q=>q.n)).size,25);
+ for(const q of d.am)assert.equal(q.answer,c.EXAM.find(a=>a.n===q.n)?.answer,`AM ${q.n}`);
+ assert.deepEqual(d.pm.fields.map(f=>f.id).sort(),Array.from(official,f=>f.id).sort());
+ const urls=[],write=(file,title,desc,body)=>{page(file,title,desc,body,[{name:'解説一覧',href:origin+'/explanations'},{name:title,href:origin+'/'+file.replace('.html','')}]);urls.push('/'+file.replace('.html',''));};
+ const policy=`<aside class="explanation-policy"><h2>この解説について</h2><p>${esc(d.policy)}</p><p>作成・確認日：${esc(d.updated)}。問題・公式解答例・採点講評の出典：<a href="${c.EXAM_ARCHIVE[d.year].source}">IPA 2025年度の過去問題</a>。</p><p><a href="https://github.com/Mochi2277/DB/issues/new" target="_blank" rel="noopener">誤り・改善点を報告する（GitHubへのログインが必要）</a>。年度・問題番号・該当箇所を添えてください。</p></aside>`;
+ const amFile=n=>`explain-${d.year}-am2-${String(n).padStart(2,'0')}.html`;
+ for(const q of d.am){const source=c.EXAM.find(a=>a.n===q.n),title=`2025年度 午前Ⅱ 問${q.n} 解説：${q.title}`;
+  write(amFile(q.n),title,`${title}。正解${q.answer}の理由、他の選択肢の確認、復習ポイントを掲載。IPAの問題原本・公式解答例と照らして学べます。`,
+   `<p><a href="./?year=2025&amp;question=${q.n}">この問題を演習する</a> ／ <a href="${files.am2_qs}#page=${source.page}">問題原本 ${source.page}ページ</a> ／ <a href="${files.am2_ans}">公式解答例PDF</a></p><figure><img class="explanation-question" src="${source.image}" alt="2025年度 午前Ⅱ 問${q.n}の問題文・図表・選択肢（IPA公式PDFを画像化）"><figcaption>出典：IPA 令和7年度秋期 データベーススペシャリスト試験</figcaption></figure><h2>正解：${q.answer}</h2><article class="explanation-body">${am(q)}</article><nav class="seo-nav" aria-label="前後の解説">${q.n>1?`<a href="${amFile(q.n-1)}">← 問${q.n-1}</a>`:''}<a href="explanations.html">解説一覧</a>${q.n<25?`<a href="${amFile(q.n+1)}">問${q.n+1} →</a>`:''}</nav>${policy}`);
+ }
+ const fieldTitle=f=>`設問${f.section}${f.part||''}${f.label?' '+f.label:''}`;
+ write('explain-2025-pm1-1.html',`2025年度 午後Ⅰ 問1 解説：${d.pm.title}`,'2025年度データベーススペシャリスト午後Ⅰ問1を全20項目で解説。大学の学習管理モデル、重なるサブタイプ、属性・主キーの選び方を本文の根拠から確認します。',
+ `<p><a href="./?year=2025&amp;mode=pm1">この問題を演習する</a> ／ <a href="${files.pm1_qs}#page=6">問題原本PDF（6〜11ページ）</a> ／ <a href="${files.pm1_ans}">公式解答例PDF</a> ／ <a href="${files.pm1_cmnt}">採点講評PDF</a></p><h2>最初に整理すること</h2>${paras(d.pm.intro)}<div class="seo-table-wrap"><table class="seo-answer-table"><caption>講義形態と二つの分類</caption><thead><tr><th>講義形態</th><th>時間固定</th><th>オンライン</th><th>固有の属性の例</th></tr></thead><tbody>${d.pm.subtypes.map(r=>`<tr>${r.map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${paras(d.pm.overview)}<h2>設問・空欄別の解説</h2><nav class="seo-nav" aria-label="解説の目次">${official.map(f=>`<a href="#field-${f.id}">${esc(fieldTitle(f))}</a>`).join('')}</nav>${d.pm.fields.map(f=>{const a=official.find(v=>v.id===f.id);return `<section class="explanation-body" id="field-${f.id}"><h2>${esc(fieldTitle(a))}</h2><p><strong>公式解答例：</strong>${(Array.isArray(a.answer)?a.answer:[a.answer]).map(esc).join(' ／ ')}</p>${a.kind==='columns'?'<p class="muted">主キー・外部キーの下線は公式解答例で確認してください。以下の文字列は下線を再現していません。</p>':''}${pm(f)}<p>${f.pages.map(p=>`<a href="${files.pm1_qs}#page=${p}">問題 ${p}ページ</a>`).join(' ／ ')}</p>${f.id==='1-2'?'<figure><a href="pages/pm1_ans/1.jpg"><img class="explanation-question" src="pages/pm1_ans/1.jpg" loading="lazy" alt="IPA公式解答例：午後Ⅰ問1の完成した概念データモデル"></a><figcaption>IPA公式解答例 1ページ。クリックで拡大して接続先と矢印を確認できます。</figcaption></figure>':''}</section>`;}).join('')}${policy}`);
+ write('explanations.html','データベーススペシャリスト 過去問の解説一覧','2025年度の午前Ⅱ25問と午後Ⅰ問1の解説。正解の理由、誤答の理由、本文の根拠と復習ポイントを確認できます。',`<p>現在の解説収録範囲は<strong>2025年度 午前Ⅱ25問・午後Ⅰ問1</strong>です。他年度・他の午後問題は、<a href="years.html">公式問題・解答例・採点講評と演習</a>を利用できます。</p><h2>2025年度 午前Ⅱ</h2><ol>${d.am.map(q=>`<li><a href="${amFile(q.n)}">問${q.n}：${esc(q.title)}</a></li>`).join('')}</ol><h2>2025年度 午後Ⅰ</h2><p><a href="explain-2025-pm1-1.html">問1：${esc(d.pm.title)}</a>（全20項目）</p>${policy}`);
+ fs.writeFileSync(path.join(root,'explanations-data.js'),'globalThis.EXPLANATIONS='+JSON.stringify(d).replace(/</g,'\\u003c')+';\n');
+ return urls;
+};
