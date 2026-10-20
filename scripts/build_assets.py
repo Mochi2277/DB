@@ -26,3 +26,6 @@ ranges=[(3,.075,.395),(3,.395,.64),(4,.075,.525),(4,.525,.91),(5,.075,.34),(5,.3
 for n,(pg,y0,y1) in enumerate(ranges,1):
     with Image.open(base/f'pages/am2_qs/{pg}.jpg') as im:
         im.crop((int(im.width*.10),int(im.height*y0),int(im.width*.95),int(im.height*y1))).save(base/f'questions/{n}.jpg',quality=92)
+
+import runpy
+runpy.run_path(str(Path(__file__).with_name('build_explanation_assets.py')))
