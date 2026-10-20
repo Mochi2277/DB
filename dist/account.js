@@ -48,6 +48,12 @@
  };
  document.addEventListener('input',()=>queueMicrotask(observe));document.addEventListener('change',()=>queueMicrotask(observe));document.addEventListener('click',()=>queueMicrotask(observe));
  window.addEventListener('beforeunload',event=>{if(user&&snapshot()!==lastSaved){event.preventDefault();event.returnValue='';}});
+ document.querySelector('.brand').addEventListener('click',async event=>{
+  if(!user||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+  event.preventDefault();
+  if(conflict||!ready||!byId('choose-progress').hidden){status('先にログインと保存データの確認を完了してください。');return;}
+  clearTimeout(timer);try{await save();location.assign('years.html');}catch(e){status(e.message+' 年度選択への移動は中止しました。');}
+ });
  globalThis.StudyAccount={async changeYear(year){if(conflict||!byId('choose-progress').hidden){status('先に保存データを選んでください。');return false;}try{if(user){if(!ready){status('ログインと保存の準備が終わってから年度を切り替えてください。');return false;}await save();}location.assign('?year='+encodeURIComponent(year));return true;}catch(e){status(e.message+' 年度の切り替えは中止しました。');return false;}}};
  lastObserved=snapshot();render();status(base?'ゲストの解答は保存されません。ログインすると自動保存されます。':'ゲストで利用中（回答保存サービスは公開設定中）');
  if(base&&token)api('me').then(r=>{user=r.user;render();return loadProgress();}).catch(e=>{if(e.status===401)remember('');status(e.message);});

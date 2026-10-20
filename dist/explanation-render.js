@@ -11,7 +11,7 @@
   const d=root.EXPLANATIONS;if(!d||Number(year)!==d.year)return;
   const q=mode==='am2'?d.am.find(q=>q.n===n):mode==='pm1'&&n===1?d.pm.fields.find(f=>f.id===id):null;
   if(!q)return;
-  const box=document.createElement('details');box.className='explanation';
+  const box=document.createElement('details');box.className='explanation';box.open=true;
   const summary=document.createElement('summary');summary.textContent='解説を読む';box.append(summary);
   const content=document.createElement('div');content.innerHTML=mode==='am2'?am(q):pm(q);box.append(content);
   const link=document.createElement('a');link.textContent='問題と解説のページを開く ↗';link.target='_blank';link.rel='noopener';
