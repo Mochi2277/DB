@@ -19,7 +19,8 @@ function renderAM(){
  for(const a of ['ア','イ','ウ','エ']){const b=element('button',a);b.type='button';b.setAttribute('aria-pressed',String(a===selected));b.setAttribute('aria-label',`選択肢 ${a}`);b.onclick=()=>{state.answers[state.q]=a;state.checked[state.q]=false;renderAM();};$('choices').append(b);}
  $('check-answer').disabled=!selected;$('clear-answer').disabled=!selected;
  $('feedback').hidden=!checked;
- if(checked){const correct=selected===q.answer;$('feedback').className='feedback'+(correct?'':' wrong');$('feedback').replaceChildren(element('strong',correct?`正解です。正解：${q.answer}`:`不正解です。正解：${q.answer} ／ あなたの解答：${selected}`),element('small','IPAの公式解答例に基づいて採点しています。詳細解説は未収録です。'));}
+ if(checked){const correct=selected===q.answer;$('feedback').className='feedback'+(correct?'':' wrong');$('feedback').replaceChildren(element('strong',correct?`正解です。正解：${q.answer}`:`不正解です。正解：${q.answer} ／ あなたの解答：${selected}`),element('small','IPAの公式解答例に基づいて採点しています。'));}
+ if(checked)globalThis.appendExplanation($('feedback'),active.year,'am2',q.n);
  $('previous').disabled=state.q===0;$('next').disabled=state.q===24;$('position').textContent=`${String(q.n).padStart(2,'0')} / 25`;
  $('question-grid').replaceChildren();
  exam.forEach((item,i)=>{let mark='';const b=element('button',String(item.n));if(state.checked[i]){const correct=state.answers[i]===item.answer;b.className=correct?'correct':'incorrect';mark=correct?'✓':'×';}else if(state.answers[i]){b.className='answered';mark='●';}b.append(element('span',mark,'mark'));b.setAttribute('aria-current',String(i===state.q));b.setAttribute('aria-label',`問${item.n} ${state.checked[i]?(state.answers[i]===item.answer?'正解':'不正解'):(state.answers[i]?'解答済み':'未解答')}`);b.onclick=()=>{state.q=i;renderAM();$('question-title').scrollIntoView({block:'start'});};$('question-grid').append(b);});
@@ -67,6 +68,7 @@ function feedbackFor(f){
  for(const a of (Array.isArray(f.answer)?f.answer:[f.answer]))detail.append(element('p',a));
  if(active.year===2025&&state.mode==='pm2'&&p.q===2&&['キ','ケ'].includes(f.label))detail.append(element('p','基準在庫数は、ケの代わりにキへ記入してもよい（IPAの備考）。両方の入力を合わせて判定します。'));
  box.append(detail);
+ globalThis.appendExplanation(box,active.year,state.mode,p.q,f.id);
  if(['manual','review'].includes(result)){
  const label=element('label','照合後の自己評価 '),select=element('select');
  for(const [value,text] of [['','未確認'],['correct','正解と判断'],['incorrect','要復習']]){const o=element('option',text);o.value=value;select.append(o);}
@@ -110,6 +112,7 @@ function renderResources(){const mode=state.mode,box=$('resources');box.replaceC
 $('year-select').value=String(active.year);$('year-select').onchange=async e=>{e.target.disabled=true;const moved=await globalThis.StudyAccount.changeYear(e.target.value);if(!moved){e.target.value=String(active.year);e.target.disabled=false;}};
  document.querySelector('.edition').textContent=active.label;document.querySelector('.side-info a').href=active.source;document.querySelector('.side-info a').textContent=`IPA ${active.year}年度 過去問題 ↗`;$('am-answer-link').href=pdf('am2','ans');$('source-credit').textContent=`出典：IPA「${active.label} データベーススペシャリスト試験」。問題・解答例・採点講評の著作権はIPAに帰属します。`;
  renderAM();renderResources();
+ if(new URLSearchParams(location.search).get('mode')==='pm1')switchMode('pm1');
 
 // Public bridge keeps authentication and persistence separate from practice UI.
 globalThis.StudyState={
