@@ -1,7 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),vm=require('node:vm');
 const dir=path.join(__dirname,'../dist'),read=f=>fs.readFileSync(path.join(dir,f),'utf8');
 const urls=[...read('sitemap.xml').matchAll(/<loc>(.*?)<\/loc>/g)].map(m=>m[1]);
-assert.equal(urls.length,21);assert.equal(new Set(urls).size,21);
+assert.equal(urls.length,48);assert.equal(new Set(urls).size,48);
 const titles=new Set(),descriptions=new Set();
 for(const url of urls){
  const route=new URL(url).pathname,file=route==='/'?'index.html':route.slice(1)+'.html',html=read(file);
@@ -31,4 +31,6 @@ for(const [query,q] of [['',0],['?question=25',24],['?question=2',1],['?question
  const context={document:{},window:{EXAM:[]},URLSearchParams,location:{search:query}};
  vm.createContext(context);vm.runInContext(setup+';globalThis.initialQ=state.q;',context);assert.equal(context.initialQ,q);
 }
-console.log('SEO: 21 canonical pages, 17 answer tables, internal links, structured data, ads, fonts and question deep links passed.');
+console.log('SEO: 48 canonical pages, 17 answer tables, internal links, structured data, ads, fonts and question deep links passed.');
+
+require('./explanations.cjs');
