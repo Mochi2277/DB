@@ -8,7 +8,7 @@
  if(typeof module==='object'&&module.exports)module.exports=api;
  root.ExplanationRender=api;
  root.appendExplanation=function(parent,year,mode,n,id){
-  const d=root.EXPLANATIONS;if(!d||Number(year)!==d.year)return;
+  const d=root.EXPLANATIONS_BY_YEAR?.[year];if(!d)return;
   const q=mode==='am2'?d.am.find(q=>q.n===n):mode==='pm1'&&n===1?d.pm.fields.find(f=>f.id===id):null;
   if(!q)return;
   const box=document.createElement('details');box.className='explanation';box.open=true;
