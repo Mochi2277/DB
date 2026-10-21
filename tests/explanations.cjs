@@ -55,3 +55,16 @@ assert.ok(95n**8n<10n**16n);assert.ok(95n**9n>10n**16n);
 // 2023: full outer join retains both unmatched sides; RANK skips after ties.
 assert.deepEqual(db.prepare('WITH a(x) AS (VALUES(100),(200),(300),(400)), b(x) AS (VALUES(200),(400),(600),(800)) SELECT COALESCE(a.x,b.x) AS v FROM a FULL OUTER JOIN b ON a.x=b.x WHERE a.x IS NULL OR b.x IS NULL ORDER BY v').all().map(x=>x.v),[100,300,600,800]);
 assert.deepEqual(db.prepare('WITH scores(x) AS (VALUES(80),(80),(63)) SELECT RANK() OVER(ORDER BY x DESC) AS r FROM scores ORDER BY x DESC').all().map(x=>x.r),[1,1,3]);
+// 2022: missing author survives two left joins; NOT EXISTS selects leaves.
+assert.deepEqual(db.prepare("WITH doc(id,author,approver) AS (VALUES(4,500,100)), employee(id,name) AS (VALUES(100,'承認者')) SELECT doc.id,a.name AS author,b.name AS approver FROM doc LEFT JOIN employee a ON a.id=doc.author LEFT JOIN employee b ON b.id=doc.approver").all().map(x=>({...x})),[{id:4,author:null,approver:'承認者'}]);
+assert.deepEqual(db.prepare("WITH employee(id,boss) AS (VALUES('S001',NULL),('S002','S001'),('S003','S001'),('S004','S003'),('S005',NULL),('S006','S005'),('S007','S006')) SELECT x.id FROM employee x WHERE NOT EXISTS(SELECT 1 FROM employee y WHERE y.boss=x.id) ORDER BY x.id").all().map(x=>x.id),['S002','S004','S007']);
+// 2021: moving right-side conditions to WHERE loses employees without AP.
+const qualifications="WITH cert(id,q) AS (VALUES('S001','FE'),('S001','AP'),('S001','DB'),('S002','FE'),('S002','SM'),('S003','FE'),('S004','AP'),('S005',NULL)) ";
+assert.deepEqual(db.prepare(qualifications+"SELECT c1.id,c2.q FROM cert c1 LEFT JOIN cert c2 ON c1.id=c2.id AND c1.q='FE' AND c2.q='AP' WHERE c1.q='FE' ORDER BY c1.id").all().map(x=>({...x})),[{id:'S001',q:'AP'},{id:'S002',q:null},{id:'S003',q:null}]);
+assert.equal(db.prepare(qualifications+"SELECT count(*) AS n FROM cert c1 LEFT JOIN cert c2 ON c1.id=c2.id WHERE c1.q='FE' AND c2.q='AP'").get().n,1);
+assert.deepEqual(db.prepare("WITH items(rowid,member,item,value) AS (VALUES(1,'0111','name','情報太郎'),(2,'0111','date','2021-02-05'),(3,'0112','name','情報花子'),(4,'0112','date','2021-01-30'),(5,'0112','date','2021-02-01'),(6,'0113','name','情報次郎')) SELECT member,MAX(CASE WHEN item='name' THEN value END) AS name,MAX(CASE WHEN item='date' THEN value END) AS date FROM items WHERE rowid IN(SELECT MAX(rowid) FROM items GROUP BY member,item) GROUP BY member ORDER BY member").all().map(x=>({...x})),[{member:'0111',name:'情報太郎',date:'2021-02-05'},{member:'0112',name:'情報花子',date:'2021-02-01'},{member:'0113',name:'情報次郎',date:null}]);
+assert.equal(60*32,80*(32-8));assert.ok(60*31>80*(31-8));
+// Late award: payment-date selection misses it; unprocessed selection retains it.
+assert.deepEqual(db.prepare("WITH payment(id,paid,created,processed) AS (VALUES(1,'2021-10-01','2021-10-03',0),(2,'2021-10-03','2021-10-03',0),(3,'2021-10-01','2021-10-01',1)) SELECT id FROM payment WHERE paid='2021-10-03' ORDER BY id").all().map(x=>x.id),[2]);
+assert.deepEqual(db.prepare("WITH payment(id,paid,created,processed) AS (VALUES(1,'2021-10-01','2021-10-03',0),(2,'2021-10-03','2021-10-03',0),(3,'2021-10-01','2021-10-01',1)) SELECT id FROM payment WHERE processed=0 ORDER BY id").all().map(x=>x.id),[1,2]);
+console.log('2021/2022 SQL examples: outer joins, latest-value pivot, leaf selection, late point awards and server capacity passed.');
