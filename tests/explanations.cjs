@@ -68,3 +68,19 @@ assert.equal(60*32,80*(32-8));assert.ok(60*31>80*(31-8));
 assert.deepEqual(db.prepare("WITH payment(id,paid,created,processed) AS (VALUES(1,'2021-10-01','2021-10-03',0),(2,'2021-10-03','2021-10-03',0),(3,'2021-10-01','2021-10-01',1)) SELECT id FROM payment WHERE paid='2021-10-03' ORDER BY id").all().map(x=>x.id),[2]);
 assert.deepEqual(db.prepare("WITH payment(id,paid,created,processed) AS (VALUES(1,'2021-10-01','2021-10-03',0),(2,'2021-10-03','2021-10-03',0),(3,'2021-10-01','2021-10-01',1)) SELECT id FROM payment WHERE processed=0 ORDER BY id").all().map(x=>x.id),[1,2]);
 console.log('2021/2022 SQL examples: outer joins, latest-value pivot, leaf selection, late point awards and server capacity passed.');
+// 2020: FULL JOIN must retain IDs from either side; SAVEPOINT undoes only later work.
+assert.deepEqual(db.prepare("WITH r(id,n1) AS (VALUES(1,'AAA'),(2,'BBB'),(3,'CCC')), s(id,n2) AS (VALUES(2,'bbb'),(3,'ccc'),(4,'ddd')) SELECT COALESCE(r.id,s.id) AS id,n1,n2 FROM r FULL JOIN s ON r.id=s.id ORDER BY id").all().map(x=>({...x})),[{id:1,n1:'AAA',n2:null},{id:2,n1:'BBB',n2:'bbb'},{id:3,n1:'CCC',n2:'ccc'},{id:4,n1:null,n2:'ddd'}]);
+db.exec('CREATE TABLE savepoint_example(x); BEGIN; INSERT INTO savepoint_example VALUES(1); SAVEPOINT midway; INSERT INTO savepoint_example VALUES(2); ROLLBACK TO midway; RELEASE midway; COMMIT;');
+assert.deepEqual(db.prepare('SELECT x FROM savepoint_example').all().map(x=>x.x),[1]);
+console.log('2020: FULL JOIN/COALESCE and partial rollback verified.');
+// 2019: difference-of-differences equals intersection, including empty/disjoint sets.
+for(const [rset,sset] of [[[],[]],[[1,2],[2,3]],[[1],[2]],[[1,2],[1,2]]]){
+ const difference=(a,b)=>a.filter(x=>!b.includes(x));
+ assert.deepEqual(difference(rset,difference(rset,sset)),rset.filter(x=>sset.includes(x)));
+}
+// One application per member/event; multiple lottery outcomes may follow it.
+db.exec('PRAGMA foreign_keys=ON; CREATE TABLE application2019(event,member,PRIMARY KEY(event,member)); CREATE TABLE lottery2019(event,member,slot,result,PRIMARY KEY(event,member,slot),FOREIGN KEY(event,member) REFERENCES application2019(event,member)); INSERT INTO application2019 VALUES(1,101); INSERT INTO lottery2019 VALUES(1,101,1,0),(1,101,2,1);');
+assert.throws(()=>db.exec('INSERT INTO application2019 VALUES(1,101)'));
+assert.throws(()=>db.exec('INSERT INTO lottery2019 VALUES(1,102,1,1)'));
+assert.equal(db.prepare('SELECT count(*) AS n FROM lottery2019 WHERE member=101').get().n,2);
+console.log('2019: set identity, application uniqueness and multistage lottery references passed.');
