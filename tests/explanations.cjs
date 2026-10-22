@@ -102,3 +102,12 @@ db.exec('CREATE TABLE approval2017(template,application,step,serial,PRIMARY KEY(
 assert.equal(db.prepare('SELECT count(*) AS n FROM approval2017 WHERE step=1').get().n,2);
 assert.throws(()=>db.exec('INSERT INTO approval2017 VALUES(1,1,3,3)'));
 console.log('2017: COUNT/NULL, outer-join aggregate and repeat approval keys passed.');
+
+// 2016: membership with duplicates/NULL and monthly point consumption.
+assert.deepEqual(db.prepare('WITH r(x) AS (VALUES(1),(1),(2),(NULL)), s(x) AS (VALUES(1),(NULL)) SELECT DISTINCT x FROM r WHERE x IN (SELECT x FROM s)').all().map(x=>x.x),[1]);
+assert.deepEqual(db.prepare('WITH r(x) AS (VALUES(1),(1),(2),(NULL)), s(x) AS (VALUES(1),(NULL)) SELECT DISTINCT x FROM r WHERE EXISTS(SELECT 1 FROM s WHERE s.x=r.x)').all().map(x=>x.x),[1]);
+db.exec("CREATE TABLE award2016(member,month,points,PRIMARY KEY(member,month)); CREATE TABLE use2016(member,month,day,points,PRIMARY KEY(member,month,day),FOREIGN KEY(member,month) REFERENCES award2016(member,month)); INSERT INTO award2016 VALUES(1,'04',250),(1,'05',60),(1,'06',250),(1,'07',20); INSERT INTO use2016 VALUES(1,'04','06-10',250),(1,'05','06-10',50),(1,'05','07-20',10),(1,'06','07-20',90);");
+assert.deepEqual(db.prepare('SELECT a.points-COALESCE(SUM(u.points),0) AS rest FROM award2016 a LEFT JOIN use2016 u ON a.member=u.member AND a.month=u.month GROUP BY a.member,a.month ORDER BY a.month').all().map(x=>x.rest),[0,0,160,20]);
+assert.deepEqual(db.prepare('SELECT SUM(points) AS used FROM use2016 GROUP BY day ORDER BY day').all().map(x=>x.used),[300,100]);
+assert.throws(()=>db.exec("INSERT INTO use2016 VALUES(2,'04','06-10',10)"));
+console.log('2016: IN/EXISTS with NULL and monthly point balances verified.');
