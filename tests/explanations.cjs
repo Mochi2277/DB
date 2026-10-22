@@ -84,3 +84,11 @@ assert.throws(()=>db.exec('INSERT INTO application2019 VALUES(1,101)'));
 assert.throws(()=>db.exec('INSERT INTO lottery2019 VALUES(1,102,1,1)'));
 assert.equal(db.prepare('SELECT count(*) AS n FROM lottery2019 WHERE member=101').get().n,2);
 console.log('2019: set identity, application uniqueness and multistage lottery references passed.');
+// 2018: UNIQUE(ID,item) allows other items and other products, not a second value.
+db.exec("CREATE TABLE eav2018(id INTEGER NOT NULL,item TEXT NOT NULL,value TEXT NOT NULL,UNIQUE(id,item)); INSERT INTO eav2018 VALUES(1,'name','light'),(1,'price','400'),(2,'name','light');");
+assert.throws(()=>db.exec("INSERT INTO eav2018 VALUES(1,'name','different')"));
+assert.deepEqual(db.prepare("WITH part(id,name,parent) AS (VALUES(1,'N11-parent',NULL),(2,'N11-child',1),(3,'other',NULL)) SELECT b1.id,b2.id AS parent FROM part b1 LEFT JOIN part b2 ON b1.parent=b2.id WHERE b1.name LIKE '%N11%' ORDER BY b1.id").all().map(x=>({...x})),[{id:1,parent:null},{id:2,parent:1}]);
+// Site numbers repeat between customers; the whole composite key must be referenced.
+db.exec('CREATE TABLE site2018(customer,site,PRIMARY KEY(customer,site)); CREATE TABLE detail2018(id PRIMARY KEY,customer,site,FOREIGN KEY(customer,site) REFERENCES site2018(customer,site)); INSERT INTO site2018 VALUES(1,1),(2,1); INSERT INTO detail2018 VALUES(1,1,1),(2,2,1);');
+assert.throws(()=>db.exec('INSERT INTO detail2018 VALUES(3,3,1)'));
+console.log('2018: EAV uniqueness, parent outer join and composite site references passed.');
