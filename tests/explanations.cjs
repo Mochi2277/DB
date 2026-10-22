@@ -92,3 +92,13 @@ assert.deepEqual(db.prepare("WITH part(id,name,parent) AS (VALUES(1,'N11-parent'
 db.exec('CREATE TABLE site2018(customer,site,PRIMARY KEY(customer,site)); CREATE TABLE detail2018(id PRIMARY KEY,customer,site,FOREIGN KEY(customer,site) REFERENCES site2018(customer,site)); INSERT INTO site2018 VALUES(1,1),(2,1); INSERT INTO detail2018 VALUES(1,1,1),(2,2,1);');
 assert.throws(()=>db.exec('INSERT INTO detail2018 VALUES(3,3,1)'));
 console.log('2018: EAV uniqueness, parent outer join and composite site references passed.');
+// 2017: COUNT ignores NULL, not zero; SQL OR keeps the unknown result.
+assert.equal(db.prepare("WITH employee(role) AS (VALUES('chief'),('staff'),('staff')) SELECT COUNT(CASE WHEN role='chief' THEN 1 ELSE NULL END) AS n FROM employee").get().n,1);
+assert.equal(db.prepare("WITH employee(role) AS (VALUES('chief'),('staff'),('staff')) SELECT COUNT(CASE WHEN role='chief' THEN 1 ELSE 0 END) AS n FROM employee").get().n,3);
+assert.equal(db.prepare('SELECT (5>NULL) OR (4>5) OR (NULL=5) AS value').get().value,null);
+assert.equal(db.prepare('WITH stock(id,qty) AS (VALUES(1,100),(2,250),(3,300),(4,450),(5,200)), shipping(id,qty) AS (VALUES(1,50),(3,150),(1,100),(5,100),(5,250),(3,150)), v AS (SELECT stock.id,stock.qty AS inventory,SUM(shipping.qty) AS shipped FROM stock LEFT JOIN shipping ON stock.id=shipping.id GROUP BY stock.id,stock.qty) SELECT SUM(inventory) AS total FROM v WHERE shipped<=300').get().total,400);
+// Reapproval repeats a step but gets a new serial within the application.
+db.exec('CREATE TABLE approval2017(template,application,step,serial,PRIMARY KEY(template,application,serial)); INSERT INTO approval2017 VALUES(1,1,1,1),(1,1,2,2),(1,1,1,3);');
+assert.equal(db.prepare('SELECT count(*) AS n FROM approval2017 WHERE step=1').get().n,2);
+assert.throws(()=>db.exec('INSERT INTO approval2017 VALUES(1,1,3,3)'));
+console.log('2017: COUNT/NULL, outer-join aggregate and repeat approval keys passed.');
