@@ -7,7 +7,7 @@ js="const fs=require('fs'),vm=require('vm'),c={};vm.createContext(c);vm.runInCon
 archive=json.loads(subprocess.check_output(['node','-e',js],cwd=root,encoding='utf-8'))
 for content in sorted((root/'scripts').glob('explanations-????.json')):
  year=json.loads(content.read_text(encoding='utf-8'))['year']
- if year==2025:continue
+ if year==2025 or year<2016:continue
  entry=archive[str(year)];dest=root/'dist/questions'/str(year);dest.mkdir(parents=True,exist_ok=True)
  with pdfium.PdfDocument(root/'dist'/entry['files']['am2_qs']) as pdf:
   for q in entry['am']:
