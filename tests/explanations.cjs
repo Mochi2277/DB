@@ -30,7 +30,7 @@ console.log('Explanations: 25 official answers, 20 PM fields, SQL set/NULL/casca
 // Every authored year must have complete, source-matched explanations and generated pages.
 const path=require('node:path'),base=path.join(__dirname,'..');
 vm.runInContext(fs.readFileSync(path.join(base,'dist/archive-data.js'),'utf8'),c);
-for(const name of fs.readdirSync(path.join(base,'scripts')).filter(n=>/^explanations-\d{4}\.json$/.test(n))){
+for(const name of fs.readdirSync(path.join(base,'scripts')).filter(n=>/^explanations-\d{4}\.json$/.test(n)&&Number(n.slice(13,17))>=2016)){
  const yearData=JSON.parse(fs.readFileSync(path.join(base,'scripts',name),'utf8'));
  const year=yearData.year,entry=c.EXAM_ARCHIVE[year];
  const am=year===2025?c.EXAM:entry.am,pm=year===2025?c.PM_FIELDS['pm1-1']:entry.fields['pm1-1'];
@@ -111,3 +111,41 @@ assert.deepEqual(db.prepare('SELECT a.points-COALESCE(SUM(u.points),0) AS rest F
 assert.deepEqual(db.prepare('SELECT SUM(points) AS used FROM use2016 GROUP BY day ORDER BY day').all().map(x=>x.used),[300,100]);
 assert.throws(()=>db.exec("INSERT INTO use2016 VALUES(2,'04','06-10',10)"));
 console.log('2016: IN/EXISTS with NULL and monthly point balances verified.');
+
+// 2015: a left join must preserve FE-only employees.
+assert.deepEqual(db.prepare("WITH cert(id,q) AS (VALUES('S001','FE'),('S001','AP'),('S001','DB'),('S002','FE'),('S002','SM'),('S003','FE'),('S004','AP'),('S005',NULL)) SELECT c1.id,c2.q FROM cert c1 LEFT JOIN cert c2 ON c1.id=c2.id AND c1.q='FE' AND c2.q='AP' WHERE c1.q='FE' ORDER BY c1.id").all().map(x=>({...x})),[{id:'S001',q:'AP'},{id:'S002',q:null},{id:'S003',q:null}]);
+// Complete the missing observation/bird pairs with zeros, without duplicate keys.
+db.exec("CREATE TABLE bird2015(n,bird,qty,PRIMARY KEY(n,bird)); INSERT INTO bird2015 VALUES(1,'A',2),(2,'B',4); INSERT INTO bird2015 SELECT DISTINCT a.n,b.bird,0 FROM bird2015 a,bird2015 b WHERE NOT EXISTS(SELECT 1 FROM bird2015 c WHERE c.n=a.n AND c.bird=b.bird);");
+assert.deepEqual(db.prepare('SELECT AVG(qty) AS avg FROM bird2015 GROUP BY bird ORDER BY bird').all().map(x=>x.avg),[1,2]);
+// Two orders for the same product share one shipment; one order is split later.
+db.exec('CREATE TABLE order2015(id,product,qty,PRIMARY KEY(id,product)); CREATE TABLE shipment2015(id PRIMARY KEY); CREATE TABLE shipdetail2015(shipment,product,orderid,qty,PRIMARY KEY(shipment,product,orderid),FOREIGN KEY(shipment) REFERENCES shipment2015(id),FOREIGN KEY(orderid,product) REFERENCES order2015(id,product)); INSERT INTO order2015 VALUES(1,10,10),(2,10,2); INSERT INTO shipment2015 VALUES(1),(2); INSERT INTO shipdetail2015 VALUES(1,10,1,4),(1,10,2,2),(2,10,1,6);');
+assert.deepEqual(db.prepare('SELECT SUM(qty) AS n FROM shipdetail2015 GROUP BY orderid ORDER BY orderid').all().map(x=>x.n),[10,2]);
+assert.throws(()=>db.exec('INSERT INTO shipdetail2015 VALUES(2,20,1,1)'));
+console.log('2015: outer join, zero-filled observations and combined/split shipments verified.');
+
+// 2025 PM II: complete field mapping, correct question routing and automatic expansion.
+function element(){return {children:[],append(v){this.children.push(v);}};}
+const rendererContext={document:{createElement:element},EXPLANATIONS_BY_YEAR:{2025:d}};
+vm.createContext(rendererContext);vm.runInContext(fs.readFileSync(path.join(base,'dist/explanation-render.js'),'utf8'),rendererContext);
+assert.deepEqual(d.pm2.map(q=>q.key),['pm2-1','pm2-2']);
+for(const q of d.pm2){
+ const n=Number(q.key.split('-')[1]),official=c.PM_FIELDS[q.key];
+ assert.deepEqual(q.fields.map(f=>f.id).sort(),Array.from(official,f=>f.id).sort());
+ const html=fs.readFileSync(path.join(base,`dist/explain-2025-${q.key}.html`),'utf8');
+ assert.ok(html.includes(`mode=pm2&amp;question=${n}`));
+ for(const f of q.fields){
+  assert.ok(f.reason.length&&f.evidence&&f.pitfall&&f.pages.length);
+  assert.ok(f.pages.every(p=>p>=(n===1?7:20)&&p<=(n===1?19:31)));
+  assert.ok(html.includes(`id="field-${f.id}"`));
+  const parent=element();rendererContext.appendExplanation(parent,2025,'pm2',n,f.id);
+  assert.equal(parent.children.length,1);assert.equal(parent.children[0].open,true);
+  assert.equal(parent.children[0].children[2].href,`explain-2025-pm2-${n}.html#field-${f.id}`);
+  assert.ok(parent.children[0].children[1].innerHTML.includes(r.esc(f.evidence)));
+ }
+}
+const absent=element();rendererContext.appendExplanation(absent,2024,'pm2',1,'1-1');assert.equal(absent.children.length,0);
+// The revised warehouse model aggregates by DC while retaining store allocation.
+db.exec("CREATE TABLE requests(dc,store,day,material,type,qty); INSERT INTO requests VALUES('A','S1','D1','M1','common',10),('A','S1','D1','M1','extra',2),('A','S2','D1','M1','common',8),('A','S2','D1','M2','common',3);");
+assert.deepEqual(db.prepare('SELECT SUM(qty) AS qty FROM requests GROUP BY dc,day,material ORDER BY material').all().map(x=>x.qty),[20,3]);
+assert.deepEqual(db.prepare('SELECT SUM(qty) AS qty FROM requests GROUP BY store,day,material ORDER BY store,material').all().map(x=>x.qty),[12,8,3]);
+console.log('2025 PM II: all 54 explanations, source pages, question links, auto-expansion and warehouse aggregation passed.');

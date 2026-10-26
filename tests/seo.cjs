@@ -1,7 +1,8 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),vm=require('node:vm');
 const dir=path.join(__dirname,'../dist'),read=f=>fs.readFileSync(path.join(dir,f),'utf8');
 const urls=[...read('sitemap.xml').matchAll(/<loc>(.*?)<\/loc>/g)].map(m=>m[1]);
-const expectedPages=22+26*fs.readdirSync(path.join(__dirname,'../scripts')).filter(f=>/^explanations-\d{4}\.json$/.test(f)).length;
+const datasets=fs.readdirSync(path.join(__dirname,'../scripts')).filter(f=>/^explanations-\d{4}\.json$/.test(f)).map(f=>JSON.parse(fs.readFileSync(path.join(__dirname,'../scripts',f),'utf8'))).filter(d=>d.year>=2016);
+const expectedPages=22+datasets.reduce((n,d)=>n+26+(d.pm2||[]).length,0);
 assert.equal(urls.length,expectedPages);assert.equal(new Set(urls).size,expectedPages);
 const titles=new Set(),descriptions=new Set();
 for(const url of urls){
