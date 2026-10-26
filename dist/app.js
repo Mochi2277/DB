@@ -112,7 +112,8 @@ function renderResources(){const mode=state.mode,box=$('resources');box.replaceC
 $('year-select').value=String(active.year);$('year-select').onchange=async e=>{e.target.disabled=true;const moved=await globalThis.StudyAccount.changeYear(e.target.value);if(!moved){e.target.value=String(active.year);e.target.disabled=false;}};
  document.querySelector('.edition').textContent=active.label;document.querySelector('.side-info a').href=active.source;document.querySelector('.side-info a').textContent=`IPA ${active.year}年度 過去問題 ↗`;$('am-answer-link').href=pdf('am2','ans');$('source-credit').textContent=`出典：IPA「${active.label} データベーススペシャリスト試験」。問題・解答例・採点講評の著作権はIPAに帰属します。`;
  renderAM();renderResources();
- if(new URLSearchParams(location.search).get('mode')==='pm1')switchMode('pm1');
+ const requestedMode=new URLSearchParams(location.search).get('mode');
+ if(['pm1','pm2'].includes(requestedMode)){const p=state.pm[requestedMode];if(Number.isInteger(requestedQuestion)&&requestedQuestion>=1&&requestedQuestion<=pmMeta[requestedMode].questions.length)p.q=requestedQuestion;p.page=pmMeta[requestedMode].questions[p.q-1].start;switchMode(requestedMode);}
 
 // Public bridge keeps authentication and persistence separate from practice UI.
 globalThis.StudyState={

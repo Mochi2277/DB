@@ -9,13 +9,13 @@
  root.ExplanationRender=api;
  root.appendExplanation=function(parent,year,mode,n,id){
   const d=root.EXPLANATIONS_BY_YEAR?.[year];if(!d)return;
-  const q=mode==='am2'?d.am.find(q=>q.n===n):mode==='pm1'&&n===1?d.pm.fields.find(f=>f.id===id):null;
+  const q=mode==='am2'?d.am.find(q=>q.n===n):[d.pm,...(d.pm2||[])].find(p=>p.key===`${mode}-${n}`)?.fields.find(f=>f.id===id);
   if(!q)return;
   const box=document.createElement('details');box.className='explanation';box.open=true;
   const summary=document.createElement('summary');summary.textContent='解説を読む';box.append(summary);
   const content=document.createElement('div');content.innerHTML=mode==='am2'?am(q):pm(q);box.append(content);
   const link=document.createElement('a');link.textContent='問題と解説のページを開く ↗';link.target='_blank';link.rel='noopener';
-  link.href=mode==='am2'?`explain-${d.year}-am2-${String(n).padStart(2,'0')}.html`:`explain-${d.year}-pm1-1.html#field-${id}`;box.append(link);
+  link.href=mode==='am2'?`explain-${d.year}-am2-${String(n).padStart(2,'0')}.html`:`explain-${d.year}-${mode}-${n}.html#field-${id}`;box.append(link);
   parent.append(box);
  };
 })(globalThis);
