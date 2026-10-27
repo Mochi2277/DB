@@ -27,7 +27,7 @@ module.exports=function({page,root,origin}){
  }
  catalog.push(`<section><h2>${d.year}年度 午前Ⅱ</h2><ol>${d.am.map(q=>`<li><a href="explain-${d.year}-am2-${String(q.n).padStart(2,'0')}.html">問${q.n}：${esc(q.title)}</a></li>`).join('')}</ol>${pmLinks.join('')}</section>`);
  }
- page('explanations.html','データベーススペシャリスト 過去問の解説一覧','年度別の午前Ⅱ25問と午後Ⅰ問1、2025年度午後Ⅱの解説。正解の理由、誤答の理由、本文の根拠と復習ポイントを確認できます。',`<p>解説を収録している年度：${datasets.map(d=>d.year+'年度').join('・')}。各年度の午前Ⅱ25問と午後Ⅰ問1、2025年度の午後Ⅱ問1・問2を掲載しています。</p><p>他の問題は<a href="years.html">年度選択</a>から公式資料と演習を利用できます。</p>${catalog.join('')}<p>各解説はAIを利用して作成した当サイト独自の解説です。原本・公式解答との照合を行っています。詳しい出典と確認日は各ページに記載しています。</p>`,[{name:'解説一覧',href:origin+'/explanations'}]);
+ page('explanations.html','データベーススペシャリスト 過去問の解説一覧','年度別の午前Ⅱ25問と午後Ⅰ問1、午後Ⅱの解説。正解の理由、誤答の理由、本文の根拠と復習ポイントを確認できます。',`<p>解説を収録している年度：${datasets.map(d=>d.year+'年度').join('・')}。各年度の午前Ⅱ25問と午後Ⅰ問1、午後Ⅱ問1・問2（${datasets.filter(d=>d.pm2?.length).map(d=>d.year+'年度').join('・')}）を掲載しています。</p><p>他の問題は<a href="years.html">年度選択</a>から公式資料と演習を利用できます。</p>${catalog.join('')}<p>各解説はAIを利用して作成した当サイト独自の解説です。原本・公式解答との照合を行っています。詳しい出典と確認日は各ページに記載しています。</p>`,[{name:'解説一覧',href:origin+'/explanations'}]);
  urls.push('/explanations');
  fs.writeFileSync(path.join(root,'explanations-data.js'),'globalThis.EXPLANATIONS_BY_YEAR='+JSON.stringify(byYear).replace(/</g,'\\u003c')+';\n globalThis.EXPLANATIONS=globalThis.EXPLANATIONS_BY_YEAR[2025];\n');
  return urls;
