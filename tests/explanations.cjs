@@ -149,3 +149,33 @@ db.exec("CREATE TABLE requests(dc,store,day,material,type,qty); INSERT INTO requ
 assert.deepEqual(db.prepare('SELECT SUM(qty) AS qty FROM requests GROUP BY dc,day,material ORDER BY material').all().map(x=>x.qty),[20,3]);
 assert.deepEqual(db.prepare('SELECT SUM(qty) AS qty FROM requests GROUP BY store,day,material ORDER BY store,material').all().map(x=>x.qty),[12,8,3]);
 console.log('2025 PM II: all 54 explanations, source pages, question links, auto-expansion and warehouse aggregation passed.');
+
+// 2024 PM II source coverage, rendering isolation and recovery arithmetic.
+const d2024=require('../scripts/explanations-2024.json');
+rendererContext.EXPLANATIONS_BY_YEAR[2024]=d2024;
+for(const q of d2024.pm2){
+ const n=Number(q.key.split('-')[1]),official=c.EXAM_ARCHIVE[2024].fields[q.key];
+ assert.deepEqual(q.fields.map(f=>f.id).sort(),Array.from(official,f=>f.id).sort());
+ const html=fs.readFileSync(path.join(base,`dist/explain-2024-${q.key}.html`),'utf8');
+ for(const f of q.fields){
+  assert.ok(f.reason.length&&f.evidence&&f.pitfall);
+  assert.ok(f.pages.length&&f.pages.every(p=>p>=(n===1?6:20)&&p<=(n===1?19:28)));
+  assert.ok(html.includes(`id="field-${f.id}"`));
+  const parent=element();rendererContext.appendExplanation(parent,2024,'pm2',n,f.id);
+  assert.equal(parent.children[0].open,true);
+  assert.ok(parent.children[0].children[1].innerHTML.includes(r.esc(f.evidence)));
+  assert.equal(parent.children[0].children[2].href,`explain-2024-pm2-${n}.html#field-${f.id}`);
+ }
+}
+assert.equal((20000+10000+40000)*.002,140);
+assert.equal((70000+40000+20000)*.002+Math.max(40000,20000)*.001,300);
+const recoverySeconds=(190000/20+100000)*.01;
+assert.equal(recoverySeconds,1095);assert.equal(Math.ceil(recoverySeconds/300)-1,3);
+assert.ok(recoverySeconds/3>300&&recoverySeconds/4<=300);
+// A report and its next due date commit together; retry only selects still-due rows.
+db.exec("CREATE TABLE due2024(id PRIMARY KEY,day); CREATE TABLE reports2024(id); INSERT INTO due2024 VALUES(1,1),(2,1);");
+function report(id,fail){db.exec('BEGIN');try{db.prepare('INSERT INTO reports2024 VALUES(?)').run(id);db.prepare('UPDATE due2024 SET day=2 WHERE id=?').run(id);if(fail)throw Error('interrupted');db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');}}
+report(1,false);report(2,true);
+for(const row of db.prepare('SELECT id FROM due2024 WHERE day=1').all())report(row.id,false);
+assert.deepEqual(db.prepare('SELECT id,COUNT(*) AS n FROM reports2024 GROUP BY id ORDER BY id').all().map(x=>[x.id,x.n]),[[1,1],[2,1]]);
+console.log('2024 PM II: 60 field explanations, recovery estimates and atomic report retry verified.');
