@@ -2,13 +2,29 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 module.exports=function({page,root,origin}){
  const datasets=fs.readdirSync(__dirname).filter(f=>/^explanations-\d{4}\.json$/.test(f)).sort().reverse().map(f=>JSON.parse(fs.readFileSync(path.join(__dirname,f),'utf8'))).filter(d=>d.year>=2016);
  const urls=[],catalog=[],byYear={};
+ const topics=require('./learning-topics.cjs'),lookup=new Map();
+ const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ for(const d of datasets){
+  for(const q of d.am)lookup.set(`${d.year}-am2-${String(q.n).padStart(2,'0')}`,`${d.year}年度 午前Ⅱ 問${q.n}：${q.title}`);
+  for(const q of [d.pm,...(d.pm2||[])])lookup.set(`${d.year}-${q.key}`,`${d.year}年度 ${q.key.startsWith('pm2')?'午後Ⅱ':'午後Ⅰ'} 問${q.key.split('-')[1]}：${q.title}`);
+ }
+ for(const t of topics){assert.equal(new Set(t.refs).size,t.refs.length);for(const id of t.refs)assert.ok(lookup.has(id),`Unknown topic reference ${id}`);}
+ const topicLink=id=>`<a href="explain-${id}.html">${escape(lookup.get(id))}</a>`;
+ const related=id=>{
+  const groups=topics.filter(t=>t.refs.includes(id));
+  if(!groups.length)return '<p><a href="topics.html">テーマ別に復習する</a></p>';
+  const refs=[...new Set(groups.flatMap(t=>{const i=t.refs.indexOf(id);return [...t.refs.slice(i+1),...t.refs.slice(0,i)];}))].filter(r=>r!==id).slice(0,4);
+  return `<section class="related-problems"><h2>関連する問題で復習</h2><ul>${refs.map(r=>`<li>${topicLink(r)}</li>`).join('')}</ul><p>${groups.map(t=>`<a href="topics.html#${t.id}">${escape(t.name)}の学習順を見る</a>`).join(' ／ ')}</p></section>`;
+ };
+ page('topics.html','データベーススペシャリスト テーマ別の過去問・解説','SQL、正規化、データモデル、トランザクション、障害回復、索引をテーマ別に復習。午前Ⅱの基礎から午後の応用へ進む学習順と関連解説を案内します。',`<p>苦手な分野から、年度をまたいで復習できます。各テーマは基本事項から応用へ進む順に並べています。まず問題を解き、解説で根拠を確かめ、次の問題で同じ考え方を使ってみましょう。</p><nav class="seo-nav" aria-label="テーマの目次">${topics.map(t=>`<a href="#${t.id}">${escape(t.name)}</a>`).join('')}</nav>${topics.map(t=>`<section id="${t.id}"><h2>${escape(t.name)}</h2><p>${escape(t.intro)}</p><ol>${t.refs.map(id=>`<li>${topicLink(id)}</li>`).join('')}</ol><p><strong>復習の確認：</strong>${escape(t.check)}</p></section>`).join('')}<p>ここでは代表的な問題を選んでいます。収録している全解説は<a href="explanations.html">年度別の解説一覧</a>で確認できます。</p>`,[{name:'テーマ別の復習',href:origin+'/topics'}]);
+ urls.push('/topics');
  for(const d of datasets){byYear[d.year]=d;
  const c={};c.window=c;vm.createContext(c);for(const file of ['data.js','pm-data.js','archive-data.js','meta-2025.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),c);
  const {esc,paras,am,pm}=require('../dist/explanation-render.js'),entry=c.EXAM_ARCHIVE[d.year],official=d.year===2025?c.PM_FIELDS[d.pm.key]:entry.fields[d.pm.key],files=entry.files,amSource=d.year===2025?c.EXAM:entry.am,pmMeta=(entry.pmMeta||c.META_2025).pm1.questions[0];
  assert.equal(d.am.length,25);assert.equal(new Set(d.am.map(q=>q.n)).size,25);
  for(const q of d.am)assert.equal(q.answer,amSource.find(a=>a.n===q.n)?.answer,`AM ${q.n}`);
  assert.deepEqual(d.pm.fields.map(f=>f.id).sort(),Array.from(official,f=>f.id).sort());
- const write=(file,title,desc,body)=>{page(file,title,desc,body,[{name:'解説一覧',href:origin+'/explanations'},{name:title,href:origin+'/'+file.replace('.html','')}]);urls.push('/'+file.replace('.html',''));};
+ const write=(file,title,desc,body)=>{const links=related(file.replace(/^explain-|\.html$/g,''));body=body.replace('<aside class="explanation-policy">',links+'<aside class="explanation-policy">');page(file,title,desc,body,[{name:'解説一覧',href:origin+'/explanations'},{name:title,href:origin+'/'+file.replace('.html','')}]);urls.push('/'+file.replace('.html',''));};
  const policy=`<aside class="explanation-policy"><h2>この解説について</h2><p>${esc(d.policy)}</p><p>作成・確認日：${esc(d.updated)}。問題・公式解答例・採点講評の出典：<a href="${c.EXAM_ARCHIVE[d.year].source}">IPA ${d.year}年度の過去問題</a>。</p><p><a href="https://github.com/Mochi2277/DB/issues/new" target="_blank" rel="noopener">誤り・改善点を報告する（GitHubへのログインが必要）</a>。年度・問題番号・該当箇所を添えてください。</p></aside>`;
  const amFile=n=>`explain-${d.year}-am2-${String(n).padStart(2,'0')}.html`;
  for(const q of d.am){const source=amSource.find(a=>a.n===q.n),title=`${d.year}年度 午前Ⅱ 問${q.n} 解説：${q.title}`;
