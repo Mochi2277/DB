@@ -6,7 +6,7 @@ module.exports=function({page,root,origin}){
  const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  for(const d of datasets){
   for(const q of d.am)lookup.set(`${d.year}-am2-${String(q.n).padStart(2,'0')}`,`${d.year}年度 午前Ⅱ 問${q.n}：${q.title}`);
-  for(const q of [d.pm,...(d.pm2||[])])lookup.set(`${d.year}-${q.key}`,`${d.year}年度 ${q.key.startsWith('pm2')?'午後Ⅱ':'午後Ⅰ'} 問${q.key.split('-')[1]}：${q.title}`);
+  for(const q of [d.pm,...(d.pm1Extra||[]),...(d.pm2||[])])lookup.set(`${d.year}-${q.key}`,`${d.year}年度 ${q.key.startsWith('pm2')?'午後Ⅱ':'午後Ⅰ'} 問${q.key.split('-')[1]}：${q.title}`);
  }
  for(const t of topics){assert.equal(new Set(t.refs).size,t.refs.length);for(const id of t.refs)assert.ok(lookup.has(id),`Unknown topic reference ${id}`);}
  const topicLink=id=>`<a href="explain-${id}.html">${escape(lookup.get(id))}</a>`;
@@ -32,7 +32,7 @@ module.exports=function({page,root,origin}){
    `<p><a href="./?year=${d.year}&amp;question=${q.n}">この問題を演習する</a> ／ <a href="${files.am2_qs}#page=${source.page}">問題原本 ${source.page}ページ</a> ／ <a href="${files.am2_ans}">公式解答例PDF</a></p><figure><img class="explanation-question" src="${source.image||`questions/${d.year}/${q.n}.jpg`}" alt="${d.year}年度 午前Ⅱ 問${q.n}の問題文・図表・選択肢（IPA公式PDFを画像化）"><figcaption>出典：IPA ${esc(entry.label)} データベーススペシャリスト試験</figcaption></figure><h2>正解：${q.answer}</h2><article class="explanation-body">${am(q)}</article><nav class="seo-nav" aria-label="前後の解説">${q.n>1?`<a href="${amFile(q.n-1)}">← 問${q.n-1}</a>`:''}<a href="explanations.html">解説一覧</a>${q.n<25?`<a href="${amFile(q.n+1)}">問${q.n+1} →</a>`:''}</nav>${policy}`);
  }
  const pmLinks=[];
- for(const pmQuestion of [d.pm,...(d.pm2||[])]){
+ for(const pmQuestion of [d.pm,...(d.pm1Extra||[]),...(d.pm2||[])]){
  const [mode,num]=pmQuestion.key.split('-'), number=Number(num), modeLabel=mode==='pm2'?'午後Ⅱ':'午後Ⅰ';
  const official=d.year===2025?c.PM_FIELDS[pmQuestion.key]:entry.fields[pmQuestion.key],pmMeta=(entry.pmMeta||c.META_2025)[mode].questions[number-1];
  assert.deepEqual(pmQuestion.fields.map(f=>f.id).sort(),Array.from(official,f=>f.id).sort());
@@ -43,7 +43,7 @@ module.exports=function({page,root,origin}){
  }
  catalog.push(`<section><h2>${d.year}年度 午前Ⅱ</h2><ol>${d.am.map(q=>`<li><a href="explain-${d.year}-am2-${String(q.n).padStart(2,'0')}.html">問${q.n}：${esc(q.title)}</a></li>`).join('')}</ol>${pmLinks.join('')}</section>`);
  }
- page('explanations.html','データベーススペシャリスト 過去問の解説一覧','年度別の午前Ⅱ25問と午後Ⅰ問1、午後Ⅱの解説。正解の理由、誤答の理由、本文の根拠と復習ポイントを確認できます。',`<p>解説を収録している年度：${datasets.map(d=>d.year+'年度').join('・')}。各年度の午前Ⅱ25問と午後Ⅰ問1、午後Ⅱ問1・問2（${datasets.filter(d=>d.pm2?.length).map(d=>d.year+'年度').join('・')}）を掲載しています。</p><p>他の問題は<a href="years.html">年度選択</a>から公式資料と演習を利用できます。</p>${catalog.join('')}<p>各解説はAIを利用して作成した当サイト独自の解説です。原本・公式解答との照合を行っています。詳しい出典と確認日は各ページに記載しています。</p>`,[{name:'解説一覧',href:origin+'/explanations'}]);
+ page('explanations.html','データベーススペシャリスト 過去問の解説一覧','年度別の午前Ⅱ25問と午後Ⅰ・午後Ⅱの解説。正解の理由、誤答の理由、本文の根拠と復習ポイントを確認できます。',`<p>解説を収録している年度：${datasets.map(d=>d.year+'年度').join('・')}。各年度の午前Ⅱ25問と午後Ⅰ問1、午後Ⅰ問2・問3（${datasets.filter(d=>d.pm1Extra?.length).map(d=>d.year+'年度').join('・')}）、午後Ⅱ問1・問2（${datasets.filter(d=>d.pm2?.length).map(d=>d.year+'年度').join('・')}）を掲載しています。</p><p>他の問題は<a href="years.html">年度選択</a>から公式資料と演習を利用できます。</p>${catalog.join('')}<p>各解説はAIを利用して作成した当サイト独自の解説です。原本・公式解答との照合を行っています。詳しい出典と確認日は各ページに記載しています。</p>`,[{name:'解説一覧',href:origin+'/explanations'}]);
  urls.push('/explanations');
  fs.writeFileSync(path.join(root,'explanations-data.js'),'globalThis.EXPLANATIONS_BY_YEAR='+JSON.stringify(byYear).replace(/</g,'\\u003c')+';\n globalThis.EXPLANATIONS=globalThis.EXPLANATIONS_BY_YEAR[2025];\n');
  return urls;
