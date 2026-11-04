@@ -207,3 +207,33 @@ const reserve=db.prepare('UPDATE stock2025 SET reserved=reserved+7,ts=ts+1 WHERE
 assert.equal(reserve.run(1).changes,1);assert.equal(reserve.run(1).changes,0);
 assert.equal(db.prepare('SELECT qty-reserved AS available FROM stock2025').get().available,3);
 console.log('2025 PM I Q2/Q3: 35 fields, rendering isolation, moving averages and stale timestamp rejection verified.');
+
+
+// 2024 PM I Q2/Q3: every official field, on-page explanation, and index arithmetic.
+assert.deepEqual(d2024.pm1Extra.map(q=>q.key),['pm1-2','pm1-3']);
+const expected2024PM1Count={'pm1-2':12,'pm1-3':19};
+for(const q of d2024.pm1Extra){
+ const n=Number(q.key.split('-')[1]),official=c.EXAM_ARCHIVE[2024].fields[q.key];
+ assert.equal(q.fields.length,expected2024PM1Count[q.key]);
+ assert.deepEqual(q.fields.map(f=>f.id).sort(),Array.from(official,f=>f.id).sort());
+ const html=fs.readFileSync(path.join(base,`dist/explain-2024-${q.key}.html`),'utf8');
+ for(const f of q.fields){
+  assert.ok(f.reason.every(s=>s.length>20)&&f.reason.length);
+  assert.ok(f.evidence&&f.pitfall&&f.pages.length);
+  assert.ok(f.pages.every(p=>p>=(n===2?14:20)&&p<=(n===2?19:26)));
+  assert.ok(html.includes(`id="field-${f.id}"`));
+  const parent=element();rendererContext.appendExplanation(parent,2024,'pm1',n,f.id);
+  assert.equal(parent.children.length,1);
+  assert.equal(parent.children[0].open,true);
+  assert.equal(parent.children[0].children[2].href,`explain-2024-pm1-${n}.html#field-${f.id}`);
+ }
+}
+assert.equal(8800/400,22);
+assert.equal(9600000/8000/(1000/20),24);
+assert.equal(8000/400,20);
+assert.equal(24*20,480);
+assert.equal((1000/20)*2*20,2000);
+assert.equal(2000/(2*20),50);
+assert.equal(db.prepare("SELECT CASE WHEN NULL IS NULL THEN 1 ELSE 0 END AS n").get().n,1);
+assert.equal(db.prepare("SELECT 3-1 AS delta").get().delta,2);
+console.log('2024 PM I Q2/Q3: all 31 explanation fields, routes and index I/O arithmetic verified.');
