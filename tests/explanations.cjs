@@ -179,3 +179,31 @@ report(1,false);report(2,true);
 for(const row of db.prepare('SELECT id FROM due2024 WHERE day=1').all())report(row.id,false);
 assert.deepEqual(db.prepare('SELECT id,COUNT(*) AS n FROM reports2024 GROUP BY id ORDER BY id').all().map(x=>[x.id,x.n]),[[1,1],[2,1]]);
 console.log('2024 PM II: 60 field explanations, recovery estimates and atomic report retry verified.');
+
+// Additional PM I questions must resolve their own field IDs, not question 1's.
+assert.deepEqual(d.pm1Extra.map(q=>q.key),['pm1-2','pm1-3']);
+for(const q of d.pm1Extra){
+ const n=Number(q.key.split('-')[1]),official=c.PM_FIELDS[q.key];
+ assert.deepEqual(q.fields.map(f=>f.id).sort(),Array.from(official,f=>f.id).sort());
+ const html=fs.readFileSync(path.join(base,`dist/explain-2025-${q.key}.html`),'utf8');
+ for(const f of q.fields){
+  assert.ok(f.reason.length&&f.evidence&&f.pitfall&&f.pages.length);
+  assert.ok(f.pages.every(p=>p>=(n===2?12:18)&&p<=(n===2?17:24)));
+  assert.ok(html.includes(`id="field-${f.id}"`));
+  const parent=element();rendererContext.appendExplanation(parent,2025,'pm1',n,f.id);
+  assert.equal(parent.children.length,1);assert.equal(parent.children[0].open,true);
+  assert.equal(parent.children[0].children[2].href,`explain-2025-pm1-${n}.html#field-${f.id}`);
+  assert.ok(parent.children[0].children[1].innerHTML.includes(r.esc(f.evidence)));
+ }
+}
+// Seven daily rows per warehouse/part; incomplete edge windows stay NULL.
+db.exec('CREATE TABLE history2025(warehouse,part,day,qty);');
+for(const [w,offset] of [['A',0],['B',100]])for(let day=1;day<=9;day++)db.prepare('INSERT INTO history2025 VALUES(?,?,?,?)').run(w,'P',day,offset+day*10);
+const moving=db.prepare('SELECT warehouse,day,CASE WHEN COUNT(*) OVER w=7 THEN AVG(qty) OVER w ELSE NULL END AS avg FROM history2025 WINDOW w AS (PARTITION BY warehouse,part ORDER BY day ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING) ORDER BY warehouse,day').all();
+assert.deepEqual(moving.filter(x=>x.avg!==null).map(x=>[x.warehouse,x.day,x.avg]),[['A',4,40],['A',5,50],['A',6,60],['B',4,140],['B',5,150],['B',6,160]]);
+// A stale timestamp cannot reserve stock; rereading requires rechecking availability.
+db.exec('CREATE TABLE stock2025(id PRIMARY KEY,qty,reserved,ts); INSERT INTO stock2025 VALUES(1,10,0,1);');
+const reserve=db.prepare('UPDATE stock2025 SET reserved=reserved+7,ts=ts+1 WHERE id=1 AND ts=?');
+assert.equal(reserve.run(1).changes,1);assert.equal(reserve.run(1).changes,0);
+assert.equal(db.prepare('SELECT qty-reserved AS available FROM stock2025').get().available,3);
+console.log('2025 PM I Q2/Q3: 35 fields, rendering isolation, moving averages and stale timestamp rejection verified.');

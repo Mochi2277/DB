@@ -2,7 +2,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const dir=path.join(__dirname,'../dist'),read=f=>fs.readFileSync(path.join(dir,f),'utf8');
 const urls=[...read('sitemap.xml').matchAll(/<loc>(.*?)<\/loc>/g)].map(m=>m[1]);
 const datasets=fs.readdirSync(path.join(__dirname,'../scripts')).filter(f=>/^explanations-\d{4}\.json$/.test(f)).map(f=>JSON.parse(fs.readFileSync(path.join(__dirname,'../scripts',f),'utf8'))).filter(d=>d.year>=2016);
-const expectedPages=23+datasets.reduce((n,d)=>n+26+(d.pm2||[]).length,0);
+const expectedPages=23+datasets.reduce((n,d)=>n+26+(d.pm1Extra||[]).length+(d.pm2||[]).length,0);
 assert.equal(urls.length,expectedPages);assert.equal(new Set(urls).size,expectedPages);
 const titles=new Set(),descriptions=new Set();
 for(const url of urls){
@@ -36,7 +36,7 @@ for(const t of topics){
   assert.ok(!section.includes(`href="explain-${id}.html"`),'Related link must not point to itself');
  }
 }
-for(const d of datasets)for(const q of d.pm2||[])assert.ok(read(`db-${d.year}.html`).includes(`href="explain-${d.year}-${q.key}.html"`));
+for(const d of datasets)for(const q of [...(d.pm1Extra||[]),...(d.pm2||[])])assert.ok(read(`db-${d.year}.html`).includes(`href="explain-${d.year}-${q.key}.html"`));
 assert.ok(read('index.html').includes('href="topics.html"'));
 for(const font of ['Regular','Bold'])assert.equal(fs.readFileSync(path.join(dir,`fonts/BIZUDPGothic-${font}.woff2`)).subarray(0,4).toString(),'wOF2');
 // Exercise the actual initial question selection, including malformed query values.
