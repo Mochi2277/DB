@@ -19,6 +19,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PDF image dependencies
+        run: pip install pypdfium2 Pillow
+      - name: Build official source assets
+        run: python scripts/build_assets.py && python scripts/fetch_pdfjs.py
       - name: Generate explanation pages
         run: node scripts/build_seo.cjs
       - name: Check explanation data, arithmetic and pages
