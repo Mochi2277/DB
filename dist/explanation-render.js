@@ -9,7 +9,7 @@
  root.ExplanationRender=api;
  root.appendExplanation=function(parent,year,mode,n,id){
   const d=root.EXPLANATIONS_BY_YEAR?.[year];if(!d)return;
-  const q=mode==='am2'?d.am.find(q=>q.n===n):[d.pm,...(d.pm2||[])].find(p=>p.key===`${mode}-${n}`)?.fields.find(f=>f.id===id);
+  const q=mode==='am2'?d.am.find(q=>q.n===n):[d.pm,...(d.pm1Extra||[]),...(d.pm2||[])].find(p=>p.key===`${mode}-${n}`)?.fields.find(f=>f.id===id);
   if(!q)return;
   const box=document.createElement('details');box.className='explanation';box.open=true;
   const summary=document.createElement('summary');summary.textContent='解説を読む';box.append(summary);
