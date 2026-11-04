@@ -1,0 +1,32 @@
+name: Validate explanation changes
+on:
+  pull_request:
+    paths:
+      - 'scripts/explanations-*.json'
+      - 'scripts/build_explanations.cjs'
+      - 'scripts/build_seo.cjs'
+      - 'tests/explanations.cjs'
+      - 'tests/seo.cjs'
+      - '.github/workflows/check-explanations-pr.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PDF image dependencies
+        run: pip install pypdfium2 Pillow
+      - name: Build official source assets
+        run: python scripts/build_assets.py && python scripts/fetch_pdfjs.py
+      - name: Generate explanation pages
+        run: node scripts/build_seo.cjs
+      - name: Check explanation data, arithmetic and pages
+        run: node tests/explanations.cjs && node tests/seo.cjs
