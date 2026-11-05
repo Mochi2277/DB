@@ -237,3 +237,35 @@ assert.equal(2000/(2*20),50);
 assert.equal(db.prepare("SELECT CASE WHEN NULL IS NULL THEN 1 ELSE 0 END AS n").get().n,1);
 assert.equal(db.prepare("SELECT 3-1 AS delta").get().delta,2);
 console.log('2024 PM I Q2/Q3: all 31 explanation fields, routes and index I/O arithmetic verified.');
+
+
+// 2023 PM I Q2/Q3: complete field mapping and automatic post-grading display.
+const extra2023=require('../scripts/explanations-2023.json').pm1Extra;
+rendererContext.EXPLANATIONS_BY_YEAR[2023]=require('../scripts/explanations-2023.json');
+assert.deepEqual(extra2023.map(q=>q.fields.length),[25,18]);
+for(const q of extra2023){
+ const n=Number(q.key.split('-')[1]);
+ assert.deepEqual(q.fields.map(f=>f.id).sort(),Array.from(c.EXAM_ARCHIVE[2023].fields[q.key],f=>f.id).sort());
+ const html=fs.readFileSync(path.join(base,`dist/explain-2023-${q.key}.html`),'utf8');
+ for(const f of q.fields){
+  assert.ok(f.reason.length&&f.reason.every(s=>s.length>20)&&f.evidence&&f.pitfall);
+  assert.ok(f.pages.length&&f.pages.every(p=>p>=(n===2?13:20)&&p<=(n===2?19:26)));
+  assert.ok(html.includes(`id="field-${f.id}"`));
+  const parent=element();rendererContext.appendExplanation(parent,2023,'pm1',n,f.id);
+  assert.equal(parent.children.length,1);assert.equal(parent.children[0].open,true);
+  assert.equal(parent.children[0].children[2].href,`explain-2023-pm1-${n}.html#field-${f.id}`);
+ }
+}
+db.exec('CREATE TABLE temp2023(field,day,temp);');
+for(const [field,offset] of [['A',0],['B',100]])[9,14,10,12,20,10,15,14,19,18].forEach((v,i)=>db.prepare('INSERT INTO temp2023 VALUES(?,?,?)').run(field,i+1,v+offset));
+const avg2023=db.prepare('SELECT day,AVG(temp) OVER(ORDER BY day ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS v FROM temp2023 WHERE field=\'A\'').all();
+assert.deepEqual([5,7,9].map(day=>avg2023.find(x=>x.day===day).v),[14,15,16]);
+const totals2023=db.prepare('SELECT field,day,SUM(temp) OVER(PARTITION BY field ORDER BY day ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS v FROM temp2023').all();
+assert.deepEqual(totals2023.filter(x=>x.day===2).map(x=>x.v),[23,223]);
+// Later grant expires sooner: consume by expiry, not grant order.
+const grants2023=[{expiry:'2023-01-21',remaining:3000},{expiry:'2022-07-24',remaining:2000}];
+let spend2023=3000;
+for(const grant of [...grants2023].sort((a,b)=>a.expiry.localeCompare(b.expiry))){const used=Math.min(spend2023,grant.remaining);grant.remaining-=used;spend2023-=used;}
+assert.deepEqual(grants2023.map(g=>g.remaining),[2000,0]);
+assert.equal(144000/16,9000);
+console.log('2023 PM I Q2/Q3: 43 fields, automatic display, SQL windows and expiry-order consumption verified.');
