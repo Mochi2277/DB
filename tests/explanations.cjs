@@ -269,3 +269,38 @@ for(const grant of [...grants2023].sort((a,b)=>a.expiry.localeCompare(b.expiry))
 assert.deepEqual(grants2023.map(g=>g.remaining),[2000,0]);
 assert.equal(144000/16,9000);
 console.log('2023 PM I Q2/Q3: 43 fields, automatic display, SQL windows and expiry-order consumption verified.');
+
+// 2022 PM I Q2/Q3: exact field coverage, page links and post-grading renderer.
+const extra2022=require('../scripts/explanations-2022.json');
+rendererContext.EXPLANATIONS_BY_YEAR[2022]=extra2022;
+assert.deepEqual(extra2022.pm1Extra.map(q=>q.fields.length),[21,14]);
+for(const q of extra2022.pm1Extra){
+ const n=Number(q.key.split('-')[1]);
+ assert.deepEqual(q.fields.map(f=>f.id).sort(),Array.from(c.EXAM_ARCHIVE[2022].fields[q.key],f=>f.id).sort());
+ const html=fs.readFileSync(path.join(base,`dist/explain-2022-${q.key}.html`),'utf8');
+ for(const f of q.fields){
+  assert.ok(f.reason.length&&f.reason.every(s=>s.length>20)&&f.evidence&&f.pitfall);
+  assert.ok(f.pages.length&&f.pages.every(p=>p>=(n===2?13:20)&&p<=(n===2?19:25)));
+  assert.ok(html.includes(`id="field-${f.id}"`));
+  const parent=element();rendererContext.appendExplanation(parent,2022,'pm1',n,f.id);
+  assert.equal(parent.children.length,1);assert.equal(parent.children[0].open,true);
+  assert.equal(parent.children[0].children[2].href,`explain-2022-pm1-${n}.html#field-${f.id}`);
+ }
+}
+// Source table 4, plus unchanged observation to ensure it is filtered before LEAD.
+db.exec(`CREATE TABLE quote2022(product,model,price,day);
+INSERT INTO quote2022 VALUES(1,'M1',1000,'2019-04-01'),(2,'M2',2000,'2019-04-01'),(3,'M3',3000,'2019-04-01'),(1,'M1-1',1000,'2020-09-01'),(2,'M2-1',2000,'2022-05-01'),(1,'M1-2',1100,'2022-09-01'),(1,'M1-1',1000,'2021-01-01');`);
+const history2022=db.prepare(`WITH q1 AS(SELECT *,LAG(model) OVER w AS prevModel,LAG(price) OVER w AS prevPrice FROM quote2022 WINDOW w AS(PARTITION BY product ORDER BY day)),q2 AS(SELECT * FROM q1 WHERE prevPrice IS NULL OR model<>prevModel OR price<>prevPrice) SELECT ROW_NUMBER() OVER(ORDER BY product,day) AS n,product,day,date(LEAD(day) OVER(PARTITION BY product ORDER BY day),'-1 day') AS end FROM q2 ORDER BY product,day`).all();
+assert.equal(history2022[1].end,'2022-08-31');assert.equal(history2022[2].day,'2022-09-01');assert.equal(history2022[2].end,null);
+assert.deepEqual(history2022.filter(x=>x.end===null).map(x=>x.n),[3,5,6]);
+assert.deepEqual(history2022.filter(x=>x.end!==null).map(x=>x.n),[1,2,4]);
+assert.equal(180e9/100e6,1800);assert.equal(24*60*60*10,864000);assert.equal(864000*0.002,1728);
+// A picker completes one order then starts another: partitioning by picker includes packing time.
+db.exec(`CREATE TABLE pick2022(shipment,picker,shelf,started,t); INSERT INTO pick2022 VALUES(1,'A',3,0,10),(1,'A',6,0,20),(2,'A',3,100,110),(2,'A',6,100,120);`);
+const gaps2022=db.prepare(`SELECT shipment,shelf,t-COALESCE(LAG(t) OVER(PARTITION BY shipment ORDER BY t),started) AS byOrder,t-COALESCE(LAG(t) OVER(PARTITION BY picker ORDER BY t),started) AS byPicker,t-COALESCE(LAG(t) OVER(PARTITION BY shelf ORDER BY t),started) AS byShelf FROM pick2022 ORDER BY shipment,shelf`).all();
+assert.equal(gaps2022[2].byOrder,10);assert.equal(gaps2022[2].byPicker,90);assert.equal(gaps2022[2].byShelf,100);
+// Two shared stock rows: reversed order permits a cycle; common total order cannot.
+function cycle2022(a,b){return a[0]===b[1]&&b[0]===a[1];}
+assert.equal(cycle2022(['3/S3','6/S6'],['6/S6','3/S3']),true);
+assert.equal(cycle2022(['3/S3','6/S6'],['3/S3','6/S6']),false);
+console.log('2022 PM I Q2/Q3: 35 fields, history migration, recovery estimates, window partitions and lock-order examples verified.');
