@@ -3,7 +3,7 @@
  const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const paras=a=>a.map(p=>`<p>${esc(p)}</p>`).join('');
  function am(q){return `<h3>正解になる理由</h3>${paras(q.reason)}${q.code?`<pre><code>${esc(q.code)}</code></pre>`:''}<h3>選択肢ごとの確認</h3><dl>${Object.entries(q.choices).map(([k,v])=>`<dt>${esc(k)}${k===q.answer?'（正解）':''}</dt><dd>${esc(v)}</dd>`).join('')}</dl><p class="explanation-tip"><strong>復習ポイント：</strong>${esc(q.tip)}</p>${q.refs?`<p>関連資料：${q.refs.map(([t,u])=>`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join(' ／ ')}</p>`:''}`;}
- function pm(f){return `<p class="muted">根拠：${esc(f.evidence)}</p>${paras(f.reason)}<p class="explanation-tip"><strong>間違えやすい点：</strong>${esc(f.pitfall)}</p>`;}
+ function pm(f){return `<p class="muted">根拠：${esc(f.evidence)}</p>${paras(f.reason)}${f.pitfall ? `<p class="explanation-tip"><strong>間違えやすい点：</strong>${esc(f.pitfall)}</p>` : ""}`;}
  const api={esc,paras,am,pm};
  if(typeof module==='object'&&module.exports)module.exports=api;
  root.ExplanationRender=api;
